@@ -11,6 +11,13 @@ const app = express();
 const server = http.createServer(app);
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  if (req.method === 'POST' && typeof req.body === 'string') {
+    try { req.body = JSON.parse(req.body); } catch(e) {}
+  }
+  next();
+});
 
 // --- Global State ---
 let esp32State = {
@@ -83,12 +90,118 @@ app.post("/api/telegram/signIn", async (req, res) => {
     // Save session string so user is logged in
     const sessionString = (client.session as StringSession).save();
     
+    // Start listening to messages
+    startTelegramListener(client);
+
     res.json({ success: true, session: sessionString, user });
   } catch (err: any) {
     console.error("GramJS Error:", err);
     res.status(500).json({ error: err.errorMessage || err.message || "Failed to sign in" });
   }
 });
+
+// Start Session
+app.post("/api/telegram/start", async (req, res) => {
+  const { sessionString, apiId, apiHash } = req.body;
+  if (!sessionString || !apiId || !apiHash) {
+    return res.status(400).json({ error: "Session string, API ID, and API Hash required" });
+  }
+
+  try {
+    const stringSession = new StringSession(sessionString);
+    const client = new TelegramClient(stringSession, parseInt(apiId, 10), apiHash, {
+      connectionRetries: 5,
+    });
+    
+    await client.connect();
+    startTelegramListener(client);
+    
+    const user = await client.getMe();
+    res.json({ success: true, user });
+  } catch (err: any) {
+    console.error("GramJS Error:", err);
+    res.status(500).json({ error: "Failed to connect session" });
+  }
+});
+
+// Telegram Listener Mapped to ESP32 State
+import { NewMessage, NewMessageEvent } from "telegram/events/index.js";
+
+function startTelegramListener(client: TelegramClient) {
+  client.addEventHandler(async (event: NewMessageEvent) => {
+    const message = event.message;
+    const text = message.text.toLowerCase();
+
+    let reply = "";
+    let matched = false;
+
+    // We mutate the global state directly
+    const currentRelays = [...esp32State.relays];
+    
+    if (text.includes("nyalakan semua")) {
+      for (let i = 0; i < 4; i++) currentRelays[i] = true;
+      reply = "Semua lampu dinyalakan.";
+      matched = true;
+    } else if (text.includes("matikan semua")) {
+      for (let i = 0; i < 4; i++) currentRelays[i] = false;
+      reply = "Semua lampu dimatikan.";
+      matched = true;
+    } else if (text.includes("nyalakan lampu 1")) {
+      currentRelays[0] = true;
+      reply = "Lampu 1 dinyalakan.";
+      matched = true;
+    } else if (text.includes("matikan lampu 1")) {
+      currentRelays[0] = false;
+      reply = "Lampu 1 dimatikan.";
+      matched = true;
+    } else if (text.includes("nyalakan lampu 2")) {
+      currentRelays[1] = true;
+      reply = "Lampu 2 dinyalakan.";
+      matched = true;
+    } else if (text.includes("matikan lampu 2")) {
+      currentRelays[1] = false;
+      reply = "Lampu 2 dimatikan.";
+      matched = true;
+    } else if (text.includes("nyalakan lampu 3")) {
+      currentRelays[2] = true;
+      reply = "Lampu 3 dinyalakan.";
+      matched = true;
+    } else if (text.includes("matikan lampu 3")) {
+      currentRelays[2] = false;
+      reply = "Lampu 3 dimatikan.";
+      matched = true;
+    } else if (text.includes("nyalakan lampu 4")) {
+      currentRelays[3] = true;
+      reply = "Lampu 4 dinyalakan.";
+      matched = true;
+    } else if (text.includes("matikan lampu 4")) {
+      currentRelays[3] = false;
+      reply = "Lampu 4 dimatikan.";
+      matched = true;
+    } else if (text.includes("variasi 1")) {
+      esp32State.variation = 1;
+      reply = "Mode Variasi 1 diaktifkan.";
+    } else if (text.includes("variasi 2")) {
+      esp32State.variation = 2;
+      reply = "Mode Variasi 2 diaktifkan.";
+    } else if (text.includes("suhu") || text.includes("kelembapan") || text.includes("kelembaban")) {
+      reply = `Suhu ruangan: ${esp32State.dht.temperature}°C, Kelembapan: ${esp32State.dht.humidity}%`;
+    }
+
+    if (matched) {
+      esp32State.relays = currentRelays;
+      esp32State.variation = 0; // Turn off variation when manual override
+    }
+
+    if (reply !== "") {
+      try {
+        await client.sendMessage(message.chatId as any, { message: reply });
+      } catch (err) {
+        console.error("Failed to reply:", err);
+      }
+    }
+  }, new NewMessage({}));
+}
 
 
 // --- ESP32 & Web Polling API ---
@@ -114,14 +227,16 @@ app.post("/api/esp32/sensor", (req, res) => {
 // For Web UI Control
 app.post("/api/esp32/relays", (req, res) => {
   const { relays } = req.body;
+  console.log("Received POST /api/esp32/relays:", req.body);
   if (Array.isArray(relays)) {
     esp32State.relays = relays;
   }
-  res.json({ success: true });
+  res.json({ success: true, updatedRelays: esp32State.relays });
 });
 
 app.post("/api/esp32/variation", (req, res) => {
   const { variation, delay } = req.body;
+  console.log("Received POST /api/esp32/variation:", req.body);
   if (variation !== undefined) esp32State.variation = Number(variation);
   if (delay !== undefined) esp32State.delay = Number(delay);
   res.json({ success: true });

@@ -10,6 +10,7 @@ function cn(...inputs: ClassValue[]) {
 
 export default function App() {
   const [sessionInfo, setSessionInfo] = useState<any>(null); // Telegram session
+  const [serverConnected, setServerConnected] = useState(false);
   const [espState, setEspState] = useState<ESP32State>({
     relays: [false, false, false, false],
     variation: 0,
@@ -37,6 +38,7 @@ export default function App() {
         const res = await fetch("/api/esp32/state", { cache: 'no-store' });
         const data = await res.json();
         if (data) {
+          setServerConnected(true);
           setEspState(prev => ({
             relays: data.relaysBool || data.relays?.map((r: any) => !!r) || prev.relays,
             variation: data.variation ?? prev.variation,
@@ -45,7 +47,7 @@ export default function App() {
           }));
         }
       } catch (err) {
-        // gracefully handle fetch error
+        setServerConnected(false);
       }
     };
 
@@ -232,8 +234,8 @@ export default function App() {
         
         <div className="flex items-center gap-4 sm:gap-6">
           <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full border border-white/10">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-            <span className="text-sm font-medium">SYSTEM ONLINE</span>
+            <div className={cn("w-2 h-2 rounded-full", serverConnected ? "bg-emerald-400 animate-pulse" : "bg-red-500")}></div>
+            <span className="text-sm font-medium">{serverConnected ? "SERVER ONLINE" : "SERVER OFFLINE"}</span>
           </div>
           <div className="flex gap-2">
             <button
