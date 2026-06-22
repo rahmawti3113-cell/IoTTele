@@ -35,7 +35,16 @@ let esp32State = {
   variation: 0, // 0: None, 1: 1-2-3-4, 2: 4-3-2-1
   delay: 100, // 50 - 500 ms
   dht: { temperature: 0.0, humidity: 0.0 },
+  notifTarget: "me", // Notification target destination
 };
+
+app.post("/api/esp32/notifTarget", (req, res) => {
+  const { target } = req.body;
+  if (target) {
+    esp32State.notifTarget = target.trim();
+  }
+  res.json({ success: true, notifTarget: esp32State.notifTarget });
+});
 
 // In-memory clients for active auth sessions
 const telegramClients: Record<string, TelegramClient> = {};
@@ -224,7 +233,8 @@ app.get("/api/esp32/state", (req, res) => {
     relaysBool: esp32State.relays, // For Web (Boolean)
     variation: esp32State.variation,
     delay: esp32State.delay,
-    dht: esp32State.dht
+    dht: esp32State.dht,
+    notifTarget: esp32State.notifTarget
   });
 });
 
@@ -251,7 +261,7 @@ app.post("/api/esp32/relays", async (req, res) => {
     if (activeBotClient) {
       try {
         const text = `⚠️ Update dari Web UI:\nLampu 1: ${relays[0] ? 'ON' : 'OFF'}\nLampu 2: ${relays[1] ? 'ON' : 'OFF'}\nLampu 3: ${relays[2] ? 'ON' : 'OFF'}\nLampu 4: ${relays[3] ? 'ON' : 'OFF'}`;
-        await activeBotClient.sendMessage("me", { message: text });
+        await activeBotClient.sendMessage(esp32State.notifTarget, { message: text });
       } catch (err) {
         console.error("Failed to send notification to Telegram:", err);
       }
@@ -270,7 +280,7 @@ app.post("/api/esp32/variation", async (req, res) => {
     try {
       const modeText = variation === 0 ? "Manual" : (variation === 1 ? "Ascending" : "Descending");
       const text = `🔄 Update dari Web UI:\nMode Variasi: ${modeText}\nInterval Delay: ${esp32State.delay}ms`;
-      await activeBotClient.sendMessage("me", { message: text });
+      await activeBotClient.sendMessage(esp32State.notifTarget, { message: text });
     } catch (err) {
       console.error("Failed to send notification to Telegram:", err);
     }

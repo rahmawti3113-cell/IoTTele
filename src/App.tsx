@@ -15,6 +15,7 @@ export default function App() {
     relays: [false, false, false, false],
     variation: 0,
     delay: 100,
+    notifTarget: "me",
     dht: { temperature: 0, humidity: 0 },
   });
 
@@ -43,6 +44,7 @@ export default function App() {
             relays: data.relaysBool || data.relays?.map((r: any) => !!r) || prev.relays,
             variation: data.variation ?? prev.variation,
             delay: data.delay ?? prev.delay,
+            notifTarget: data.notifTarget ?? prev.notifTarget,
             dht: data.dht || prev.dht
           }));
         }
@@ -318,6 +320,27 @@ export default function App() {
                   />
                   <p className="mt-2 text-xs text-slate-500">Include country code (e.g. +62)</p>
                 </div>
+                <div>
+                  <label className="block text-sm font-bold mb-1.5 text-slate-300">
+                    Nama Bot
+                  </label>
+                  <input
+                    type="text"
+                    value={espState.notifTarget || "me"}
+                    onChange={(e) => setEspState(prev => ({ ...prev, notifTarget: e.target.value }))}
+                    placeholder="nama_bot_anda"
+                    className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-[#24A1DE] focus:border-transparent outline-none transition font-mono placeholder:text-slate-600"
+                    onBlur={(e) => {
+                      let val = e.target.value.trim();
+                      if (val && val !== "me" && !val.startsWith("@")) {
+                        val = "@" + val;
+                        setEspState(prev => ({ ...prev, notifTarget: val }));
+                      }
+                      fetch("/api/esp32/notifTarget", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target: val }) });
+                    }}
+                  />
+                  <p className="mt-2 text-xs text-slate-500">Gunakan "me" untuk tersimpan sendiri atau masukkan ID Bot Anda langsung.</p>
+                </div>
                 <button
                   type="submit"
                   disabled={loading}
@@ -505,7 +528,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="mt-auto hidden lg:block">
+                <div className="mt-auto hidden lg:block pt-4">
                   <div className="bg-black/40 rounded-xl p-3 border border-white/5 h-32 flex flex-col">
                     <p className="text-[10px] text-slate-400 font-mono mb-2 uppercase flex-shrink-0">Terminal Output</p>
                     <div className="font-mono text-[10px] text-emerald-400/80 leading-relaxed overflow-y-auto flex-1 flex flex-col justify-end">
