@@ -10,6 +10,16 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
@@ -216,12 +226,17 @@ app.get("/api/esp32/state", (req, res) => {
 });
 
 app.post("/api/esp32/sensor", (req, res) => {
-  const { temperature, humidity } = req.body;
+  console.log("Received POST /api/esp32/sensor:", req.body);
+  const { temperature, humidity } = req.body || {};
   
-  if (temperature !== undefined) esp32State.dht.temperature = Number(temperature);
-  if (humidity !== undefined) esp32State.dht.humidity = Number(humidity);
+  if (temperature !== undefined && temperature !== null && !isNaN(Number(temperature))) {
+    esp32State.dht.temperature = Number(temperature);
+  }
+  if (humidity !== undefined && humidity !== null && !isNaN(Number(humidity))) {
+    esp32State.dht.humidity = Number(humidity);
+  }
 
-  res.json({ success: true });
+  res.json({ success: true, dht: esp32State.dht });
 });
 
 // For Web UI Control

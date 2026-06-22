@@ -228,7 +228,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight uppercase">ESP32-TELEGRAM NODE</h1>
-            <p className="text-xs text-slate-400 font-mono hidden sm:block">STATION ID: ESP32_RELAY_4CH_V1</p>
+            <p className="text-xs text-sky-400 font-mono hidden sm:block tracking-widest">STATION ID: ESP32_RELAY_4CH_V2</p>
           </div>
         </div>
         
@@ -586,6 +586,8 @@ const int pollInterval = 1000;
 // WiFi Secure Client untuk HTTPS
 WiFiClientSecure secureClient;
 
+const char* stationId = "ESP32_RELAY_4CH_V2";
+
 void setup() {
   Serial.begin(115200);
   
@@ -603,7 +605,8 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\\nConnected to WiFi");
+  Serial.println("\\nConnected to "+String(ssid));
+  Serial.println("API Target: " + String(apiStateUrl));
 
   // Bypass SSL Certificate validation (Penting untuk Cloud Run / Vercel HTTPS)
   secureClient.setInsecure();
@@ -624,20 +627,28 @@ void fetchState() {
     int httpCode = http.GET();
     
     if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
-      Serial.println("GET State: Berhasil");
       String payload = http.getString();
       DynamicJsonDocument doc(1024);
-      deserializeJson(doc, payload);
+      DeserializationError error = deserializeJson(doc, payload);
 
-      variationMode = doc["variation"];
-      variationDelay = doc["delay"];
+      if (error) {
+        Serial.print("JSON parse failed: ");
+        Serial.println(error.c_str());
+        Serial.println("Payload: " + payload);
+      } else {
+        Serial.println("GET State: Berhasil");
+        variationMode = doc["variation"] | 0;
+        variationDelay = doc["delay"] | 100;
 
-      if (variationMode == 0) {
-        JsonArray relays = doc["relays"];
-        for(int i=0; i<4; i++) {
-          currentStates[i] = relays[i];
+        if (variationMode == 0) {
+          JsonArray relays = doc["relays"];
+          if (!relays.isNull()) {
+            for(int i=0; i<4; i++) {
+              currentStates[i] = relays[i];
+            }
+          }
+          updateRelays();
         }
-        updateRelays();
       }
     } else {
       Serial.print("Error GET State. HTTP Code: ");
