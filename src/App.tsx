@@ -15,7 +15,7 @@ export default function App() {
     relays: [false, false, false, false],
     variation: 0,
     delay: 100,
-    notifTarget: "me",
+    notifTarget: "",
     dht: { temperature: 0, humidity: 0 },
   });
 
@@ -326,20 +326,20 @@ export default function App() {
                   </label>
                   <input
                     type="text"
-                    value={espState.notifTarget || "me"}
+                    value={espState.notifTarget || ""}
                     onChange={(e) => setEspState(prev => ({ ...prev, notifTarget: e.target.value }))}
                     placeholder="nama_bot_anda"
                     className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-[#24A1DE] focus:border-transparent outline-none transition font-mono placeholder:text-slate-600"
                     onBlur={(e) => {
                       let val = e.target.value.trim();
-                      if (val && val !== "me" && !val.startsWith("@")) {
+                      if (val && !val.startsWith("@")) {
                         val = "@" + val;
                         setEspState(prev => ({ ...prev, notifTarget: val }));
                       }
                       fetch("/api/esp32/notifTarget", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target: val }) });
                     }}
                   />
-                  <p className="mt-2 text-xs text-slate-500">Gunakan "me" untuk tersimpan sendiri atau masukkan ID Bot Anda langsung.</p>
+                  <p className="mt-2 text-xs text-slate-500">Masukkan username / ID bot Anda (misal: @nama_bot_anda).</p>
                 </div>
                 <button
                   type="submit"

@@ -35,12 +35,12 @@ let esp32State = {
   variation: 0, // 0: None, 1: 1-2-3-4, 2: 4-3-2-1
   delay: 100, // 50 - 500 ms
   dht: { temperature: 0.0, humidity: 0.0 },
-  notifTarget: "me", // Notification target destination
+  notifTarget: "", // Notification target destination
 };
 
 app.post("/api/esp32/notifTarget", (req, res) => {
   const { target } = req.body;
-  if (target) {
+  if (target !== undefined) {
     esp32State.notifTarget = target.trim();
   }
   res.json({ success: true, notifTarget: esp32State.notifTarget });
@@ -258,7 +258,7 @@ app.post("/api/esp32/relays", async (req, res) => {
   console.log("Received POST /api/esp32/relays:", req.body);
   if (Array.isArray(relays)) {
     esp32State.relays = relays;
-    if (activeBotClient) {
+    if (activeBotClient && esp32State.notifTarget) {
       try {
         const text = `⚠️ Update dari Web UI:\nLampu 1: ${relays[0] ? 'ON' : 'OFF'}\nLampu 2: ${relays[1] ? 'ON' : 'OFF'}\nLampu 3: ${relays[2] ? 'ON' : 'OFF'}\nLampu 4: ${relays[3] ? 'ON' : 'OFF'}`;
         await activeBotClient.sendMessage(esp32State.notifTarget, { message: text });
@@ -276,7 +276,7 @@ app.post("/api/esp32/variation", async (req, res) => {
   if (variation !== undefined) esp32State.variation = Number(variation);
   if (delay !== undefined) esp32State.delay = Number(delay);
   
-  if (activeBotClient && variation !== undefined) {
+  if (activeBotClient && variation !== undefined && esp32State.notifTarget) {
     try {
       const modeText = variation === 0 ? "Manual" : (variation === 1 ? "Ascending" : "Descending");
       const text = `🔄 Update dari Web UI:\nMode Variasi: ${modeText}\nInterval Delay: ${esp32State.delay}ms`;
