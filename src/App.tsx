@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from "react";
-import { io, Socket } from "socket.io-client";
 import { Power, Mic, Terminal, Activity, Thermometer, Droplet, Send } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -8,8 +7,6 @@ import type { ESP32State } from "./types";
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-const socket = io();
 
 export default function App() {
   const [sessionInfo, setSessionInfo] = useState<any>(null); // Telegram session
@@ -33,14 +30,47 @@ export default function App() {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
 
+  // Polling server state
   useEffect(() => {
-    socket.on("stateUpdate", (state: ESP32State) => {
-      setEspState(state);
-    });
-    return () => {
-      socket.off("stateUpdate");
+    const fetchState = async () => {
+      try {
+        const res = await fetch("/api/esp32/state");
+        const data = await res.json();
+        if (data && data.relaysBool) {
+          setEspState({
+            relays: data.relaysBool,
+            variation: data.variation,
+            delay: data.delay,
+            dht: data.dht
+          });
+        }
+      } catch (err) {
+        // gracefully handle fetch error
+      }
     };
+
+    fetchState();
+    const interval = setInterval(fetchState, 1000);
+    return () => clearInterval(interval);
   }, []);
+
+  const setServerRelays = async (newRelays: boolean[]) => {
+    setEspState(prev => ({ ...prev, relays: newRelays }));
+    await fetch("/api/esp32/relays", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ relays: newRelays })
+    });
+  };
+
+  const setServerVariation = async (variation: number, delay: number) => {
+    setEspState(prev => ({ ...prev, variation, delay }));
+    await fetch("/api/esp32/variation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ variation, delay })
+    });
+  };
 
   // Initialize Speech Recognition
   useEffect(() => {
