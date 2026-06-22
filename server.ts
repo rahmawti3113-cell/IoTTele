@@ -134,10 +134,13 @@ app.post("/api/telegram/start", async (req, res) => {
   }
 });
 
-// Telegram Listener Mapped to ESP32 State
+// ...
 import { NewMessage, NewMessageEvent } from "telegram/events/index.js";
 
+let activeBotClient: TelegramClient | null = null;
+
 function startTelegramListener(client: TelegramClient) {
+  activeBotClient = client;
   client.addEventHandler(async (event: NewMessageEvent) => {
     const message = event.message;
     const text = message.text.toLowerCase();
@@ -240,20 +243,39 @@ app.post("/api/esp32/sensor", (req, res) => {
 });
 
 // For Web UI Control
-app.post("/api/esp32/relays", (req, res) => {
+app.post("/api/esp32/relays", async (req, res) => {
   const { relays } = req.body;
   console.log("Received POST /api/esp32/relays:", req.body);
   if (Array.isArray(relays)) {
     esp32State.relays = relays;
+    if (activeBotClient) {
+      try {
+        const text = `⚠️ Update dari Web UI:\nLampu 1: ${relays[0] ? 'ON' : 'OFF'}\nLampu 2: ${relays[1] ? 'ON' : 'OFF'}\nLampu 3: ${relays[2] ? 'ON' : 'OFF'}\nLampu 4: ${relays[3] ? 'ON' : 'OFF'}`;
+        await activeBotClient.sendMessage("me", { message: text });
+      } catch (err) {
+        console.error("Failed to send notification to Telegram:", err);
+      }
+    }
   }
   res.json({ success: true, updatedRelays: esp32State.relays });
 });
 
-app.post("/api/esp32/variation", (req, res) => {
+app.post("/api/esp32/variation", async (req, res) => {
   const { variation, delay } = req.body;
   console.log("Received POST /api/esp32/variation:", req.body);
   if (variation !== undefined) esp32State.variation = Number(variation);
   if (delay !== undefined) esp32State.delay = Number(delay);
+  
+  if (activeBotClient && variation !== undefined) {
+    try {
+      const modeText = variation === 0 ? "Manual" : (variation === 1 ? "Ascending" : "Descending");
+      const text = `🔄 Update dari Web UI:\nMode Variasi: ${modeText}\nInterval Delay: ${esp32State.delay}ms`;
+      await activeBotClient.sendMessage("me", { message: text });
+    } catch (err) {
+      console.error("Failed to send notification to Telegram:", err);
+    }
+  }
+
   res.json({ success: true });
 });
 
