@@ -27,6 +27,7 @@ export default function App() {
   const [step, setStep] = useState<"phone" | "code" | "dashboard">("phone");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [localBotInput, setLocalBotInput] = useState("");
 
   // Voice Command State
   const [listening, setListening] = useState(false);
@@ -47,6 +48,7 @@ export default function App() {
             notifTarget: data.notifTarget ?? prev.notifTarget,
             dht: data.dht || prev.dht
           }));
+          setLocalBotInput(prev => prev === "" && data.notifTarget ? data.notifTarget : prev);
         }
       } catch (err) {
         setServerConnected(false);
@@ -326,16 +328,17 @@ export default function App() {
                   </label>
                   <input
                     type="text"
-                    value={espState.notifTarget || ""}
-                    onChange={(e) => setEspState(prev => ({ ...prev, notifTarget: e.target.value }))}
+                    value={localBotInput}
+                    onChange={(e) => setLocalBotInput(e.target.value)}
                     placeholder="nama_bot_anda"
                     className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-[#24A1DE] focus:border-transparent outline-none transition font-mono placeholder:text-slate-600"
                     onBlur={(e) => {
                       let val = e.target.value.trim();
                       if (val && !val.startsWith("@")) {
                         val = "@" + val;
-                        setEspState(prev => ({ ...prev, notifTarget: val }));
+                        setLocalBotInput(val);
                       }
+                      setEspState(prev => ({ ...prev, notifTarget: val }));
                       fetch("/api/esp32/notifTarget", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target: val }) });
                     }}
                   />
