@@ -34,15 +34,15 @@ export default function App() {
   useEffect(() => {
     const fetchState = async () => {
       try {
-        const res = await fetch("/api/esp32/state");
+        const res = await fetch("/api/esp32/state", { cache: 'no-store' });
         const data = await res.json();
-        if (data && data.relaysBool) {
-          setEspState({
-            relays: data.relaysBool,
-            variation: data.variation,
-            delay: data.delay,
-            dht: data.dht
-          });
+        if (data) {
+          setEspState(prev => ({
+            relays: data.relaysBool || data.relays?.map((r: any) => !!r) || prev.relays,
+            variation: data.variation ?? prev.variation,
+            delay: data.delay ?? prev.delay,
+            dht: data.dht || prev.dht
+          }));
         }
       } catch (err) {
         // gracefully handle fetch error
